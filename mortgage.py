@@ -149,7 +149,7 @@ elif page == "ChatGPT":
             st.write("### Chat History")
             for message in st.session_state.messages:
                 legacy_chat_message(message["role"], message["content"])
-
+        
         # Accept user input - with fallback for older Streamlit versions
         try:
             prompt = st.chat_input("What would you like to know?")
@@ -162,7 +162,7 @@ elif page == "ChatGPT":
                 pass  # This will allow the prompt to be processed below
             else:
                 prompt = None  # If button not clicked, don't process input
-            
+                
         if prompt:
             # Add user message to chat history
             st.session_state.messages.append({"role": "user", "content": prompt})
@@ -182,31 +182,29 @@ elif page == "ChatGPT":
                 message_placeholder = st.empty()
                 message_placeholder.markdown("Thinking...")
                 
-                try:
-                    # Call OpenAI API
-                    response = openai.chat.completions.create(
-                        api_key=openai_api_key,  # Use the key from the text input
-                        model="gpt-4o",
-                        messages=[
-                            {"role": m["role"], "content": m["content"]}
-                            for m in st.session_state.messages
-                        ],
-                        stream=True
-                    )
-                    
-                    # Stream the response
-                    full_response = ""
-                    for chunk in response:
-                        if chunk.choices[0].delta.content is not None:
-                            full_response += chunk.choices[0].delta.content
-                        message_placeholder.markdown(full_response + "▌")
-                    
-                    # Final response without cursor
-                    message_placeholder.markdown(full_response)
+            try:
+                # Initialize OpenAI client with the provided API key
+                client = openai.OpenAI(api_key=openai_api_key)
                 
-                except Exception as e:
-                    message_placeholder.markdown(f"Error: {str(e)}")
-                    st.error(f"An error occurred: {str(e)}")
+                # Call OpenAI API
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": m["role"], "content": m["content"]}
+                        for m in st.session_state.messages
+                    ],
+                    stream=True
+                )
+                
+                # Stream the response
+                full_response = ""
+                for chunk in response:
+                    if chunk.choices[0].delta.content is not None:
+                        full_response += chunk.choices[0].delta.content
+                    message_placeholder.markdown(full_response + "▌")
+                
+                # Final response without cursor
+                message_placeholder.markdown(full_response)
                 
                 # Add assistant response to chat history
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
@@ -215,6 +213,14 @@ elif page == "ChatGPT":
                 if not has_chat_message:
                     st.write("**New response:**")
                     legacy_chat_message("assistant", full_response)
+            
+            except Exception as e:
+                error_message = f"Error: {str(e)}"
+                message_placeholder.markdown(error_message)
+                st.error(f"An error occurred: {str(e)}")
+                
+                # Add error message to chat history instead of undefined full_response
+                st.session_state.messages.append({"role": "assistant", "content": error_message})
 
         # Add a button to clear chat history
         if st.button("Clear Conversation"):
